@@ -4,7 +4,6 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-
 #登录逻辑
 app.secret_key = os.environ.get("SECRET_KEY")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -20,7 +19,7 @@ def check_login():
 
     if not session.get("logged_in"):
         return redirect("/login")
-        
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
 
@@ -33,122 +32,122 @@ def login():
 
         return "密码错误"
 
-return """
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理员登录</title>
+    return """
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员登录</title>
 
-<style>
-    body {
-        margin: 0;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        font-family: "Microsoft YaHei", Arial, sans-serif;
-    }
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
 
-    .login-box {
-        width: 360px;
-        padding: 40px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        text-align: center;
-    }
+        .login-box {
+            width: 360px;
+            padding: 40px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            text-align: center;
+        }
 
-    .logo {
-        font-size: 42px;
-        margin-bottom: 15px;
-    }
+        .logo {
+            font-size: 42px;
+            margin-bottom: 15px;
+        }
 
-    h2 {
-        margin-bottom: 30px;
-        color: #333;
-        font-weight: 600;
-    }
+        h2 {
+            margin-bottom: 30px;
+            color: #333;
+            font-weight: 600;
+        }
 
-    input {
-        width: 100%;
-        height: 45px;
-        padding: 0 15px;
-        box-sizing: border-box;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        font-size: 16px;
-        outline: none;
-        transition: 0.3s;
-    }
+        input {
+            width: 100%;
+            height: 45px;
+            padding: 0 15px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: 0.3s;
+        }
 
-    input:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 8px rgba(102,126,234,0.3);
-    }
+        input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 8px rgba(102,126,234,0.3);
+        }
 
-    button {
-        margin-top: 25px;
-        width: 100%;
-        height: 45px;
-        border: none;
-        border-radius: 8px;
-        background: #667eea;
-        color: white;
-        font-size: 16px;
-        cursor: pointer;
-        transition: 0.3s;
-    }
+        button {
+            margin-top: 25px;
+            width: 100%;
+            height: 45px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
 
-    button:hover {
-        background: #5568d3;
-    }
+        button:hover {
+            background: #5568d3;
+        }
 
-    .footer {
-        margin-top: 25px;
-        font-size: 13px;
-        color: #999;
-    }
-</style>
+        .footer {
+            margin-top: 25px;
+            font-size: 13px;
+            color: #999;
+        }
+    </style>
 
-</head>
+    </head>
 
-<body>
+    <body>
 
-<div class="login-box">
+    <div class="login-box">
 
-    <div class="logo">🔐</div>
+        <div class="logo">🔐</div>
 
-    <h2>管理员登录</h2>
+        <h2>管理员登录</h2>
 
-    <form method="post">
+        <form method="post">
 
-        <input 
-            type="password" 
-            name="password" 
-            placeholder="请输入管理员密码"
-            required
-        >
+            <input 
+                type="password" 
+                name="password" 
+                placeholder="请输入管理员密码"
+                required
+            >
 
-        <button type="submit">
-            登录
-        </button>
+            <button type="submit">
+                登录
+            </button>
 
-    </form>
+        </form>
 
-    <div class="footer">
-        Reminder Management System
+        <div class="footer">
+            Reminder Management System
+        </div>
+
     </div>
 
-</div>
-
-</body>
-</html>
-"""
-
+    </body>
+    </html>
+    """
 #
+
 @app.route('/setting', methods=['GET', 'POST'])
 def setting():
 
