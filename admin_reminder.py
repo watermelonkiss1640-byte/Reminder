@@ -13,6 +13,14 @@ devices = {}
 #默认无操作提醒时间
 idle_limit_minutes = 15
 
+@app.before_request
+def check_login():
+    if request.endpoint in ["login", "static"]:
+        return
+
+    if not session.get("logged_in"):
+        return redirect("/login")
+        
 @app.route('/login', methods=['GET', 'POST'])
 def login():
 
@@ -34,8 +42,6 @@ def login():
 #
 @app.route('/setting', methods=['GET', 'POST'])
 def setting():
-    if not session.get("logged_in"):
-        return redirect("/login")
 
     global idle_limit_minutes
 
