@@ -1,7 +1,11 @@
 import os
 from flask import Flask, request, jsonify, session, redirect
+from datetime import datetime
 
 app = Flask(__name__)
+
+
+#登录逻辑
 app.secret_key = os.environ.get("SECRET_KEY")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
@@ -9,11 +13,30 @@ devices = {}
 #默认无操作提醒时间
 idle_limit_minutes = 15
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
 
+    if request.method == "POST":
+        password = request.form.get("password")
 
+        if password == ADMIN_PASSWORD:
+            session["logged_in"] = True
+            return redirect("/setting")
 
+        return "密码错误"
+
+    return """
+    <form method="post">
+        <input type="password" name="password">
+        <button type="submit">登录</button>
+    </form>
+    """
+#
 @app.route('/setting', methods=['GET', 'POST'])
 def setting():
+    if not session.get("logged_in"):
+        return redirect("/login")
+
     global idle_limit_minutes
 
     if request.method == "POST":
