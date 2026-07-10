@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify
-from datetime import datetime
+import os
+from flask import Flask, request, jsonify, session, redirect
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
 devices = {}
 #默认无操作提醒时间
