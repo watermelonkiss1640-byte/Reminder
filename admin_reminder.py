@@ -1,0 +1,489 @@
+from flask import Flask, request, jsonify
+from datetime import datetime
+
+app = Flask(__name__)
+
+devices = {}
+#默认无操作提醒时间
+idle_limit_minutes = 15
+
+
+
+
+@app.route('/setting', methods=['GET', 'POST'])
+def setting():
+    global idle_limit_minutes
+
+    if request.method == "POST":
+        value = request.form.get("minutes")
+
+        idle_limit_minutes = int(value)
+
+    html = f"""
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>无操作提醒设置</title>
+<style>
+    body {{
+    margin:0;
+    padding:30px;
+    background:#f5f7fb;
+    font-family:
+    "Microsoft YaHei",
+    Arial,
+    sans-serif;
+    }}
+    .container {{
+
+    max-width:600px;
+
+    margin:auto;
+   }}
+   
+    .title {{
+
+    font-size:28px;
+
+    font-weight:bold;
+
+    color:#1f2937;
+
+    margin-bottom:25px;
+
+    }}
+    .card {{
+
+    background:white;
+
+    padding:30px;
+
+    border-radius:12px;
+
+    box-shadow:
+    0 3px 10px rgba(0,0,0,0.05);
+
+    }}
+    .label {{
+
+    font-size:16px;
+
+    color:#374151;
+
+    margin-bottom:10px;
+
+    display:block;
+
+    
+    }}
+    input {{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px;
+    font-size:16px;
+    border-radius:8px;
+    border:1px solid #d1d5db;
+    margin-bottom:20px;
+    }}
+    button {{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:8px;
+    background:#1B4388;
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+    }}
+    button:hover {{
+    background:#16366d;
+    }}
+    .info {{
+    margin-top:20px;
+    padding:15px;
+    background:#f3f4f6;
+    border-radius:8px;
+    color:#4b5563;
+    }}
+   </style>
+</head>
+<body>
+<div class="container">
+<div class="title">
+无操作提醒设置
+</div>
+<div class="card">
+<form method="post">
+<label class="label">
+多少分钟无操作后提醒：
+</label>
+<input type="number" name="minutes" min="1" max="999" value="{idle_limit_minutes}">
+<button type="submit">
+保存设置
+</button>
+</form>
+<div class="info">
+当前设置：电脑连续无操作 
+<b>{idle_limit_minutes}</b>分钟后触发提醒。
+</div>
+</div>
+</div>
+</body>
+</html>
+"""
+    return html
+
+@app.route('/config')
+def config():
+
+    return jsonify({
+
+        "idle_limit_minutes": idle_limit_minutes
+
+    })
+
+@app.route('/report', methods=['POST'])
+def report():
+    data = request.json
+    #print测试客户端返回的数据
+    #print("收到客户端数据:", data)
+    pc = data.get("pc")
+    user = data.get("user")
+    ip = data.get("ip")
+    idle = data.get("idle")
+    timestamp = data.get("timestamp")
+
+    if pc not in devices:
+        devices[pc] = {}
+
+    devices[pc].update({
+
+        "user": user,
+
+        "ip": ip,
+
+        # 当前无操作时间
+        "idle": idle,
+
+        # 最近上报
+        "time": timestamp,
+
+    })
+
+    return jsonify({
+        "status": "ok"
+    })
+
+#关闭弹窗后返回提醒时间
+@app.route('/warning_confirm', methods=['POST'])
+def warning_confirm():
+
+    data = request.json
+
+    pc = data.get("pc")
+
+
+    if pc not in devices:
+        devices[pc] = {}
+
+
+    devices[pc]["last_idle"] = data.get("idle")
+
+    devices[pc]["last_warning_time"] = data.get("timestamp")
+
+
+    return jsonify({
+        "status":"ok"
+    })
+
+@app.route('/')
+def index():
+    total = len(devices)
+    online = 0
+    away = 0
+    for pc, v in devices.items():
+
+        if v["idle"] >= idle_limit_minutes:
+            away += 1
+        else:
+            online += 1
+    html = """
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8">
+
+<title>员工居家办公状态</title>
+
+<meta http-equiv="refresh" content="30">
+
+<style>
+
+body {
+
+    margin:0;
+    padding:30px;
+    background:#f5f7fb;
+    font-family:
+    "Microsoft YaHei",
+    Arial,
+    sans-serif;
+
+}
+
+
+.container {
+
+    max-width:1200px;
+
+    margin:auto;
+
+}
+
+
+.title {
+
+    font-size:28px;
+
+    font-weight:bold;
+
+    margin-bottom:25px;
+
+    color:#1f2937;
+
+}
+
+
+/* 数据卡片 */
+
+.cards {
+
+    display:flex;
+
+    gap:20px;
+
+    margin-bottom:30px;
+
+}
+
+
+.card {
+
+    background:white;
+
+    padding:20px;
+
+    border-radius:12px;
+
+    flex:1;
+
+    box-shadow:
+    0 3px 10px rgba(0,0,0,0.05);
+
+}
+
+
+.card h3 {
+
+    margin:0;
+
+    color:#6b7280;
+
+    font-size:14px;
+
+}
+
+
+.card p {
+
+    margin-top:10px;
+
+    font-size:30px;
+
+    font-weight:bold;
+
+}
+
+
+/* 表格 */
+
+
+.table-box {
+
+    background:white;
+
+    border-radius:12px;
+
+    padding:20px;
+
+    box-shadow:
+    0 3px 10px rgba(0,0,0,0.05);
+
+}
+
+
+table {
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+
+th {
+
+    background:#f3f4f6;
+
+    padding:14px;
+
+    text-align:left;
+
+    color:#374151;
+
+}
+
+
+td {
+
+    padding:14px;
+
+    border-bottom:
+    1px solid #eee;
+
+}
+
+
+tr:hover {
+
+    background:#f9fafb;
+
+}
+
+
+/* 状态 */
+
+
+.normal {
+
+    color:#16a34a;
+
+    font-weight:bold;
+
+}
+
+.away {
+
+    color:#dc2626;
+
+    font-weight:bold;
+
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="title">
+员工居家办公实时状态
+</div>
+<div class="cards">
+<div class="card">
+
+<h3>设备总数</h3>
+
+<p>
+""" + str(total) + """
+</p>
+
+</div>
+<div class="card">
+
+<h3>当前在线</h3>
+
+<p style="color:#16a34a">
+
+""" + str(online) + """
+
+</p>
+</div>
+<div class="card">
+
+<h3>当前无操作</h3>
+
+<p style="color:#dc2626">
+
+""" + str(away) + """
+
+</p>
+</div>
+</div>
+<div class="table-box">
+<table>
+<tr>
+<th>电脑</th>
+<th>用户</th>
+<th>IP</th>
+<th>电脑状态</th>
+<th>最近一次无操作时长</th>
+<th>最近一次提醒</th>
+
+</tr>
+
+"""
+    #当前这台电脑现在有没有超过无操作时间。
+    # 输出设备列表
+    for pc, v in devices.items():
+       if v["idle"] >= idle_limit_minutes:
+            status = """
+<span class="away">
+无操作
+</span>
+"""
+       else:
+           status = """
+<span class="normal">
+在线
+</span>
+"""
+
+       html += f"""
+
+<tr>
+
+<td>{pc}</td>
+
+<td>{v['user']}</td>
+
+<td>{v['ip']}</td>
+
+<td>{status}</td>
+
+<td>
+{v.get('last_idle','-')}分钟
+</td>
+
+<td>
+{v.get('last_warning_time','-')}
+</td>
+
+</tr>
+
+"""
+    html += """
+</table>
+</div>
+</div>
+
+</body>
+</html>
+
+"""
+
+    return html
+
+
+app.run(
+   host="0.0.0.0",
+   port=5000
+)
