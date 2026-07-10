@@ -18,7 +18,12 @@ idle_limit_minutes = 15
 def check_login():
     #打印结果
     #print("访问:", request.path, "登录状态:", session.get("logged_in"))
-    if request.endpoint in ["login", "static"]:
+    if request.endpoint in [
+        "login",
+        "static",
+        "report",
+        "config",
+        "warning_confirm"]:
         return
 
     if not session.get("logged_in"):
