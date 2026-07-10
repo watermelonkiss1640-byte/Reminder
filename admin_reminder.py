@@ -1,12 +1,14 @@
 import os
 from flask import Flask, request, jsonify, session, redirect
-from datetime import datetime
+from datetime import timedelta
 
 app = Flask(__name__)
 
 #登录逻辑
-app.secret_key = os.environ.get("SECRET_KEY")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+app.secret_key = os.environ.get("SECRET_KEY", "local-test-key")
+app.config["SESSION_PERMANENT"] = False
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD","123456")
+app.permanent_session_lifetime = timedelta(minutes=30)
 
 devices = {}
 #默认无操作提醒时间
@@ -14,6 +16,8 @@ idle_limit_minutes = 15
 
 @app.before_request
 def check_login():
+    #打印结果
+    #print("访问:", request.path, "登录状态:", session.get("logged_in"))
     if request.endpoint in ["login", "static"]:
         return
 
@@ -28,7 +32,7 @@ def login():
 
         if password == ADMIN_PASSWORD:
             session["logged_in"] = True
-            return redirect("/setting")
+            return redirect("/")
 
         return "密码错误"
 
@@ -622,7 +626,8 @@ tr:hover {
     return html
 
 
-app.run(
-   host="0.0.0.0",
-   port=5000
-)
+if __name__ == "__main__":
+    app.run(
+       host="0.0.0.0",
+       port=int(os.environ.get("PORT",5000))
+    )
