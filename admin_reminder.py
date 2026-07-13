@@ -318,7 +318,7 @@ def report():
     popup_time = data.get("popup_time")
     timestamp = data.get("timestamp")
     # 客户端弹窗时间（如果客户端有发送）
-    now = datetime.now()
+    now = datetime.utcnow() + timedelta(hours=8)
 
     if pc not in devices:
         devices[pc] = {
