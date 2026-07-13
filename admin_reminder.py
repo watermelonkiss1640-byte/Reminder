@@ -346,6 +346,14 @@ def report():
     device["ip"] = ip
     device["time"] = timestamp
     device["last_report_time"] = now
+    print(
+        "收到心跳:",
+        pc,
+        "idle:",
+        idle,
+        "服务器时间:",
+        now
+    )
 
 
     # =====================
