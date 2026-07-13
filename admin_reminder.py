@@ -347,6 +347,7 @@ def report():
     device["time"] = timestamp
     device["last_report_time"] = now
 
+
     # =====================
     # 当前进入无操作
     # =====================
@@ -381,6 +382,17 @@ def report():
 
 @app.route('/')
 def index():
+    now = datetime.utcnow() + timedelta(hours=8)
+    # 清理超过7天没有心跳的设备
+    remove_list = []
+
+    for pc, v in devices.items():
+
+        if now - v["last_report_time"] > timedelta(days=7):
+            remove_list.append(pc)
+
+    for pc in remove_list:
+        del devices[pc]
 
     total = len(devices)
 
@@ -388,13 +400,11 @@ def index():
     away = 0
     offline = 0
 
-    now = datetime.utcnow() + timedelta(hours=8)
-
 
     for pc, v in devices.items():
 
-        # 超过15分钟没有客户端心跳
-        if now - v["last_report_time"] > timedelta(minutes=10):
+        # 超过10分钟没有客户端心跳
+        if now - v["last_report_time"] > timedelta(minutes=30):
 
             v["status"] = "未连接"
 
