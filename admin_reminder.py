@@ -297,6 +297,10 @@ def config():
 
         "work_end_time": work_end_time,
 
+        "lunch_start_time": "12:00",
+
+        "lunch_end_time": "13:00",
+
         "work_days": work_days
 
     })
@@ -320,13 +324,15 @@ def report():
         devices[pc] = {
             "user": user,
             "ip": ip,
-            "idle": 0,
-            "status": "在线",
+            "idle": idle,
+            "status": "无操作" if idle == 1 else "在线",
             "time": timestamp,
+            "last_report_time": now,
 
-            "idle_start": None,
+            "idle_start": now if idle == 1 else None,
             "last_idle_duration": "0分钟",
             "last_popup_time": "-"
+
         }
 
     device = devices[pc]
@@ -334,6 +340,7 @@ def report():
     device["user"] = user
     device["ip"] = ip
     device["time"] = timestamp
+    device["last_report_time"] = now
     # =====================
     # 当前进入无操作
     # =====================
@@ -344,9 +351,8 @@ def report():
 
             device["idle_start"] = now
 
-            # 记录弹窗时间
-            if popup_time:
-                device["last_popup_time"] = popup_time
+            # 第一次进入无操作状态记录时间
+            device["last_popup_time"] = timestamp
 
         device["status"] = "无操作"
         # =====================
@@ -374,28 +380,6 @@ def report():
         "status": "ok"
     })
 
-#关闭弹窗后返回提醒时间
-@app.route('/warning_confirm', methods=['POST'])
-def warning_confirm():
-
-    data = request.json
-
-    pc = data.get("pc")
-
-
-    if pc not in devices:
-        devices[pc] = {}
-
-
-    devices[pc]["last_idle"] = data.get("idle")
-
-    devices[pc]["last_warning_time"] = data.get("timestamp")
-
-
-    return jsonify({
-        "status":"ok"
-    })
-
 @app.route('/')
 def index():
     total = len(devices)
@@ -403,9 +387,16 @@ def index():
     away = 0
     for pc, v in devices.items():
 
-        if v["idle"] == 1:
+        if datetime.now() - v["last_report_time"] > timedelta(minutes=5):
+
+            v["status"] = "离线"
+
+        elif v["idle"] == 1:
+
             away += 1
+
         else:
+
             online += 1
     html = """
 <!DOCTYPE html>
@@ -634,51 +625,61 @@ tr:hover {
     #当前这台电脑现在有没有超过无操作时间。
     # 输出设备列表
     for pc, v in devices.items():
-       if v["idle"] == 1:
+        if v.get("status") == "离线":
+
             status = """
-<span class="away">
-无操作
-</span>
-"""
-       else:
-           status = """
-<span class="normal">
-在线
-</span>
-"""
+       <span class="away">
+       离线
+       </span>
+       """
 
-       html += f"""
+        elif v["idle"] == 1:
 
-<tr>
+            status = """
+       <span class="away">
+       无操作
+       </span>
+       """
 
-<td>{pc}</td>
+        else:
 
-<td>{v['user']}</td>
-
-<td>{v['ip']}</td>
-
-<td>{status}</td>
-
-<td>
-{v.get('last_idle_duration','-')}
-</td>
-
-<td>
-{v.get('last_popup_time','-')}
-</td>
-
-</tr>
-
-"""
+            status = """
+       <span class="normal">
+       在线
+       </span>
+       """
+        html += f"""
+        
+        <tr>
+        
+        <td>{pc}</td>
+        
+        <td>{v['user']}</td>
+        
+        <td>{v['ip']}</td>
+        
+        <td>{status}</td>
+        
+        <td>
+        {v.get('last_idle_duration','-')}
+        </td>
+        
+        <td>
+        {v.get('last_popup_time','-')}
+        </td>
+        
+        </tr>
+        
+        """
     html += """
-</table>
-</div>
-</div>
-
-</body>
-</html>
-
-"""
+                </table>
+                </div>
+                </div>
+                
+                </body>
+                </html>
+                
+    """
 
     return html
 
