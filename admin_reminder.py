@@ -329,12 +329,16 @@ def report():
             "time": timestamp,
             "last_report_time": now,
 
-            "idle_start": now if idle == 1 else None,
-            "last_idle_duration": "0分钟",
-            "last_popup_time": "-"
+            # 最近一次提醒时间
+            "last_popup_time": "-",
 
+            # 今日提醒次数
+            "today_popup_count": 0,
 
+            # 记录提醒日期，用于每天自动清零
+            "popup_date": now.date()
         }
+
 
     device = devices[pc]
     # 更新基础信息
@@ -342,8 +346,7 @@ def report():
     device["ip"] = ip
     device["time"] = timestamp
     device["last_report_time"] = now
-    # 保存客户端真实无操作时间
-    device["last_idle_duration"] = f"{idle_minutes}分钟"
+
     # =====================
     # 当前进入无操作
     # =====================
@@ -351,26 +354,26 @@ def report():
 
         # 之前是在线，现在变无操作
         if device["idle"] == 0:
-
-            device["idle_start"] = now
-
-            # 第一次进入无操作状态记录时间
-            if popup_time:
-                device["last_popup_time"] = popup_time
-
-        device["status"] = "无操作"
+           device["status"] = "无操作"
         # =====================
         # 当前有人操作
         # =====================
     else:
-
-        # 之前是无操作，现在恢复
-        if device["idle"] == 1:
-            pass# 不再由服务器计算无操作时长
-
         device["status"] = "在线"
-        # 保存当前状态
+    # 保存当前状态
     device["idle"] = idle
+    # 处理弹窗记录
+    if popup_time:
+
+        today = now.date()
+
+        if device["popup_date"] != today:
+            device["today_popup_count"] = 0
+            device["popup_date"] = today
+
+        device["last_popup_time"] = popup_time
+
+        device["today_popup_count"] += 1
 
     return jsonify({
         "status": "ok"
@@ -390,20 +393,23 @@ def index():
 
     for pc, v in devices.items():
 
-        if now - v["last_report_time"] > timedelta(minutes=15):
+        # 超过15分钟没有客户端心跳
+        if now - v["last_report_time"] > timedelta(minutes=10):
 
             v["status"] = "未连接"
 
             offline += 1
 
 
-        elif v["idle"] == 1:
+        # 客户端在线，但是没有键鼠操作
+        elif v.get("idle", 0) == 1:
 
             v["status"] = "无操作"
 
             away += 1
 
 
+        # 客户端正常工作
         else:
 
             v["status"] = "在线"
@@ -417,7 +423,6 @@ def index():
 <meta charset="utf-8">
 
 <title>员工居家办公状态</title>
-
 <meta http-equiv="refresh" content="30">
 
 <style>
@@ -611,6 +616,16 @@ tr:hover {
 </div>
 <div class="card">
 
+<h3>电脑休眠</h3>
+
+<p style="color:#dc2626">
+
+""" + str(offline) + """
+
+</p>
+</div>
+<div class="card">
+
 <h3>当前无操作</h3>
 
 <p style="color:#dc2626">
@@ -627,9 +642,8 @@ tr:hover {
 <th>用户</th>
 <th>IP</th>
 <th>电脑状态</th>
-<th>最近一次无操作时长</th>
-<th>最近一次提醒</th>
-
+<th>最近一次办公提醒</th>
+<th>今日提醒次数</th>
 </tr>
 
 """
@@ -672,12 +686,12 @@ tr:hover {
         <td>{status}</td>
         
         <td>
-        {v.get('last_idle_duration','-')}
-        </td>
-        
-        <td>
         {v.get('last_popup_time','-')}
         </td>
+        <td>
+        {v.get('today_popup_count',0)}
+        </td>
+        
         
         </tr>
         
