@@ -342,6 +342,8 @@ def report():
     device["ip"] = ip
     device["time"] = timestamp
     device["last_report_time"] = now
+    # 保存客户端真实无操作时间
+    device["last_idle_duration"] = f"{idle_minutes}分钟"
     # =====================
     # 当前进入无操作
     # =====================
@@ -364,15 +366,7 @@ def report():
 
         # 之前是无操作，现在恢复
         if device["idle"] == 1:
-
-            if device["idle_start"]:
-                duration = now - device["idle_start"]
-
-                minutes = int(
-                    duration.total_seconds() / 60
-                )
-
-                device["last_idle_duration"] = f"{minutes}分钟"
+            pass# 不再由服务器计算无操作时长
 
         device["status"] = "在线"
         # 保存当前状态
@@ -384,20 +378,35 @@ def report():
 
 @app.route('/')
 def index():
+
     total = len(devices)
+
     online = 0
     away = 0
+    offline = 0
+
+    now = datetime.utcnow() + timedelta(hours=8)
+
+
     for pc, v in devices.items():
 
-        if datetime.now() - v["last_report_time"] > timedelta(minutes=5):
+        if now - v["last_report_time"] > timedelta(minutes=5):
 
             v["status"] = "离线"
 
+            offline += 1
+
+
         elif v["idle"] == 1:
+
+            v["status"] = "无操作"
 
             away += 1
 
+
         else:
+
+            v["status"] = "在线"
 
             online += 1
     html = """
