@@ -333,6 +333,7 @@ def report():
             "last_idle_duration": "0分钟",
             "last_popup_time": "-"
 
+
         }
 
     device = devices[pc]
@@ -352,7 +353,8 @@ def report():
             device["idle_start"] = now
 
             # 第一次进入无操作状态记录时间
-            device["last_popup_time"] = timestamp
+            if popup_time:
+                device["last_popup_time"] = popup_time
 
         device["status"] = "无操作"
         # =====================
