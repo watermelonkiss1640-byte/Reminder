@@ -390,9 +390,9 @@ def index():
 
     for pc, v in devices.items():
 
-        if now - v["last_report_time"] > timedelta(minutes=5):
+        if now - v["last_report_time"] > timedelta(minutes=15):
 
-            v["status"] = "离线"
+            v["status"] = "未连接"
 
             offline += 1
 
@@ -636,11 +636,11 @@ tr:hover {
     #当前这台电脑现在有没有超过无操作时间。
     # 输出设备列表
     for pc, v in devices.items():
-        if v.get("status") == "离线":
+        if v.get("status") == "未连接":
 
             status = """
        <span class="away">
-       离线
+       未连接
        </span>
        """
 
