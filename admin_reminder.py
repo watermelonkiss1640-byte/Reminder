@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify, session, redirect
-from datetime import timedelta
+from datetime import timedelta,datetime
 
 app = Flask(__name__)
 
@@ -299,24 +299,65 @@ def report():
     user = data.get("user")
     ip = data.get("ip")
     idle = data.get("idle")
+    idle_minutes = data.get("idle_minutes")
+    popup_time = data.get("popup_time")
     timestamp = data.get("timestamp")
+    # 客户端弹窗时间（如果客户端有发送）
+    now = datetime.now()
 
     if pc not in devices:
-        devices[pc] = {}
+        devices[pc] = {
+            "user": user,
+            "ip": ip,
+            "idle": 0,
+            "status": "在线",
+            "time": timestamp,
 
-    devices[pc].update({
+            "idle_start": None,
+            "last_idle_duration": "0分钟",
+            "last_popup_time": "-"
+        }
 
-        "user": user,
+    device = devices[pc]
+    # 更新基础信息
+    device["user"] = user
+    device["ip"] = ip
+    device["time"] = timestamp
+    # =====================
+    # 当前进入无操作
+    # =====================
+    if idle == 1:
 
-        "ip": ip,
+        # 之前是在线，现在变无操作
+        if device["idle"] == 0:
 
-        # 当前无操作时间
-        "idle": idle,
+            device["idle_start"] = now
 
-        # 最近上报
-        "time": timestamp,
+            # 记录弹窗时间
+            if popup_time:
+                device["last_popup_time"] = popup_time
 
-    })
+        device["status"] = "无操作"
+        # =====================
+        # 当前有人操作
+        # =====================
+    else:
+
+        # 之前是无操作，现在恢复
+        if device["idle"] == 1:
+
+            if device["idle_start"]:
+                duration = now - device["idle_start"]
+
+                minutes = int(
+                    duration.total_seconds() / 60
+                )
+
+                device["last_idle_duration"] = f"{minutes}分钟"
+
+        device["status"] = "在线"
+        # 保存当前状态
+    device["idle"] = idle
 
     return jsonify({
         "status": "ok"
@@ -351,7 +392,7 @@ def index():
     away = 0
     for pc, v in devices.items():
 
-        if v["idle"] >= idle_limit_minutes:
+        if v["idle"] == 1:
             away += 1
         else:
             online += 1
@@ -582,7 +623,7 @@ tr:hover {
     #当前这台电脑现在有没有超过无操作时间。
     # 输出设备列表
     for pc, v in devices.items():
-       if v["idle"] >= idle_limit_minutes:
+       if v["idle"] == 1:
             status = """
 <span class="away">
 无操作
@@ -608,11 +649,11 @@ tr:hover {
 <td>{status}</td>
 
 <td>
-{v.get('last_idle','-')}分钟
+{v.get('last_idle_duration','-')}分钟
 </td>
 
 <td>
-{v.get('last_warning_time','-')}
+{v.get('last_popup_time','-')}
 </td>
 
 </tr>
