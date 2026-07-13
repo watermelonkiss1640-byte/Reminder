@@ -649,7 +649,7 @@ tr:hover {
 <td>{status}</td>
 
 <td>
-{v.get('last_idle_duration','-')}分钟
+{v.get('last_idle_duration','-')}
 </td>
 
 <td>
