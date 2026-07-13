@@ -13,6 +13,12 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 devices = {}
 #默认无操作提醒时间
 idle_limit_minutes = 15
+# 工作时间配置
+work_start_time = "09:00"
+work_end_time = "18:00"
+
+# 工作日（周一到周五）
+work_days = [0,1,2,3,4]
 
 @app.before_request
 def check_login():
@@ -285,8 +291,13 @@ def setting():
 def config():
 
     return jsonify({
+        "idle_limit_minutes": idle_limit_minutes,
 
-        "idle_limit_minutes": idle_limit_minutes
+        "work_start_time": work_start_time,
+
+        "work_end_time": work_end_time,
+
+        "work_days": work_days
 
     })
 
