@@ -12,7 +12,7 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 
 devices = {}
 #默认无操作提醒时间
-idle_limit_minutes = 15
+idle_limit_minutes = 20
 # 工作时间配置
 work_start_time = "09:00"
 work_end_time = "18:00"
@@ -22,18 +22,37 @@ work_days = [0,1,2,3,4]
 
 @app.before_request
 def check_login():
-    #打印结果
-    #print("访问:", request.path, "登录状态:", session.get("logged_in"))
-    if request.endpoint in [
+
+    allow_list = [
         "login",
         "static",
         "report",
-        "config",
-        "warning_confirm"]:
+        "warning_confirm"
+    ]
+
+    if request.endpoint and request.endpoint in allow_list:
         return
 
     if not session.get("logged_in"):
         return redirect("/login")
+
+
+@app.route('/warning_confirm', methods=['POST'])
+def warning_confirm():
+
+    data=request.json
+
+    pc=data.get("pc")
+
+    if pc in devices:
+
+        devices[pc]["alert_showing"]=False
+
+        devices[pc]["idle_start_time"]=datetime.utcnow()+timedelta(hours=8)
+
+    return jsonify({
+        "status":"ok"
+    })
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -316,6 +335,7 @@ def report():
     idle = data.get("idle")
     idle_minutes = data.get("idle_minutes")
     popup_time = data.get("popup_time")
+    alert_closed = data.get("alert_closed")
     timestamp = data.get("timestamp")
     # 客户端弹窗时间（如果客户端有发送）
     now = datetime.utcnow() + timedelta(hours=8)
@@ -336,11 +356,24 @@ def report():
             "today_popup_count": 0,
 
             # 记录提醒日期，用于每天自动清零
-            "popup_date": now.date()
+            "popup_date": now.date(),
+
+            "last_alert_time": None,
+
+            "alert_showing": False,
+
+            "alert_closed": True,
+
+            "alert_required": False,
+
+            "idle_start_time": None
         }
 
 
     device = devices[pc]
+    # 用户关闭提醒
+    if alert_closed:
+        device["alert_closed"] = True
     # 更新基础信息
     device["user"] = user
     device["ip"] = ip
@@ -355,38 +388,77 @@ def report():
         now
     )
 
+    # =========================
+    # 服务器判断是否需要提醒
+    # =========================
 
-    # =====================
-    # 当前进入无操作
-    # =====================
+    show_alert = False
+
     if idle == 1:
 
-        # 之前是在线，现在变无操作
-        if device["idle"] == 0:
-           device["status"] = "无操作"
-        # =====================
-        # 当前有人操作
-        # =====================
-    else:
-        device["status"] = "在线"
-    # 保存当前状态
-    device["idle"] = idle
-    # 处理弹窗记录
-    if popup_time:
+        # 第一次进入无操作
+        if device["idle_start_time"] is None:
+            device["idle_start_time"] = now
 
-        today = now.date()
+        idle_seconds = (
+                now -
+                device["idle_start_time"]
+        ).total_seconds()
 
-        if device["popup_date"] != today:
-            device["today_popup_count"] = 0
-            device["popup_date"] = today
+        if idle_seconds >= idle_limit_minutes * 60:
 
-        device["last_popup_time"] = popup_time
+            if not device["alert_showing"]:
 
-        device["today_popup_count"] += 1
+                show_alert = True
+
+
+
+            elif device["last_alert_time"] is not None:
+
+                alert_gap = (
+
+                        now -
+
+                        device["last_alert_time"]
+
+                ).total_seconds()
+
+                if alert_gap >= idle_limit_minutes * 60:
+                    show_alert = True
+
+            if show_alert:
+                device["last_alert_time"] = now
+
+                print(
+                    "触发提醒:",
+                    pc,
+                    "show_alert:",
+                    show_alert,
+                    "idle时间:",
+                    idle_seconds
+                )
+
+                device["alert_showing"] = True
+                device["status"] = "无操作"
+                # =====================
+                # 记录提醒次数
+                # =====================
+                today = now.date()
+
+                if device["popup_date"] != today:
+                    device["today_popup_count"] = 0
+                    device["popup_date"] = today
+
+                device["last_popup_time"] = (
+                    now.strftime("%Y-%m-%d %H:%M:%S")
+                )
+
+                device["today_popup_count"] += 1
 
     return jsonify({
-        "status": "ok"
-    })
+         "status": "ok",
+         "show_alert": show_alert
+     })
 
 @app.route('/')
 def index():
@@ -411,7 +483,7 @@ def index():
 
     for pc, v in devices.items():
 
-        # 超过10分钟没有客户端心跳
+        # 超过30分钟没有客户端心跳
         if now - v["last_report_time"] > timedelta(minutes=30):
 
             v["status"] = "未连接"
@@ -420,7 +492,7 @@ def index():
 
 
         # 客户端在线，但是没有键鼠操作
-        elif v.get("idle", 0) == 1:
+        elif v.get("idle", 0) == 1 or v.get("status") == "无操作":
 
             v["status"] = "无操作"
 
@@ -612,6 +684,14 @@ tr:hover {
 <div class="title">
 员工居家办公实时状态
 </div>
+<div style="
+        margin-top:12px;
+        color:#dc2626;
+        font-size:14px;
+        font-weight:bold;
+    ">
+        备注：仅记录工作日 09:00-12:00、13:00-18:00 的电脑状态。
+    </div>
 <div class="cards">
 <div class="card">
 
