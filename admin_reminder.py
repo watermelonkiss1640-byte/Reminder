@@ -22,15 +22,12 @@ work_days = [0,1,2,3,4]
 
 @app.before_request
 def check_login():
-
-    allow_list = [
-        "login",
-        "static",
-        "report",
-        "warning_confirm"
-    ]
-
-    if request.endpoint and request.endpoint in allow_list:
+    if request.path in [
+        "/login",
+        "/report",
+        "/config",
+        "/static/favicon.ico"
+    ]:
         return
 
     if not session.get("logged_in"):
@@ -393,6 +390,7 @@ def report():
     # =========================
 
     show_alert = False
+    idle_seconds = 0
 
     if idle == 1:
 
@@ -454,10 +452,17 @@ def report():
                 )
 
                 device["today_popup_count"] += 1
-
+    # print(
+    #     "返回客户端:",
+    #     int(idle_seconds / 60),
+    #     "show_alert:",
+    #     show_alert
+    # )
     return jsonify({
          "status": "ok",
-         "show_alert": show_alert
+         "show_alert": show_alert,
+         "idle_minutes": int(idle_seconds / 60),
+         "idle_limit_minutes": idle_limit_minutes
      })
 
 @app.route('/')
@@ -483,7 +488,7 @@ def index():
 
     for pc, v in devices.items():
 
-        # 超过30分钟没有客户端心跳
+        # 超过30分钟没有客户端心跳的数量
         if now - v["last_report_time"] > timedelta(minutes=30):
 
             v["status"] = "未连接"
@@ -491,15 +496,14 @@ def index():
             offline += 1
 
 
-        # 客户端在线，但是没有键鼠操作
-        elif v.get("idle", 0) == 1 or v.get("status") == "无操作":
+        # 客户端无操作数量
+        elif v.get("idle_status") == 1:
 
             v["status"] = "无操作"
-
             away += 1
 
 
-        # 客户端正常工作
+        # 客户端正常工作的数量
         else:
 
             v["status"] = "在线"
@@ -756,7 +760,7 @@ tr:hover {
        </span>
        """
 
-        elif v["idle"] == 1:
+        elif v.get("idle_status") == 1:
 
             status = """
        <span class="away">
