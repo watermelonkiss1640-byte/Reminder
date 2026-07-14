@@ -379,14 +379,14 @@ def report():
     device["ip"] = ip
     device["time"] = timestamp
     device["last_report_time"] = now
-    print(
-        "收到心跳:",
-        pc,
-        "idle:",
-        idle,
-        "服务器时间:",
-        now
-    )
+    # print(
+    #     "收到心跳:",
+    #     pc,
+    #     "idle:",
+    #     idle,
+    #     "服务器时间:",
+    #     now
+    # )
 
     # =========================
     # 服务器判断是否需要提醒
@@ -429,14 +429,14 @@ def report():
             if show_alert:
                 device["last_alert_time"] = now
 
-                print(
-                    "触发提醒:",
-                    pc,
-                    "show_alert:",
-                    show_alert,
-                    "idle时间:",
-                    idle_seconds
-                )
+                # print(
+                #     "触发提醒:",
+                #     pc,
+                #     "show_alert:",
+                #     show_alert,
+                #     "idle时间:",
+                #     idle_seconds
+                # )
 
                 device["alert_showing"] = True
                 device["status"] = "无操作"
