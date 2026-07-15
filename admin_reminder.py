@@ -330,7 +330,7 @@ def report():
     user = data.get("user")
     ip = data.get("ip")
     idle = data.get("idle")
-    idle_minutes = data.get("idle_minutes")
+    server_idle_minutes = data.get("server_idle_minutes")
     popup_time = data.get("popup_time")
     alert_closed = data.get("alert_closed")
     timestamp = data.get("timestamp")
@@ -461,8 +461,7 @@ def report():
     return jsonify({
          "status": "ok",
          "show_alert": show_alert,
-         "idle_minutes": int(idle_seconds / 60),
-         "idle_limit_minutes": idle_limit_minutes
+         "server_idle_minutes": int(idle_seconds / 60),
      })
 
 @app.route('/')
