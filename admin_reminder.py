@@ -26,7 +26,9 @@ def check_login():
         "/login",
         "/report",
         "/config",
-        "/static/favicon.ico"
+        "/static/favicon.ico",
+        "/warning_confirm",
+        "/popup_show"
     ]:
         return
 
@@ -47,8 +49,63 @@ def warning_confirm():
 
         devices[pc]["idle_start_time"]=datetime.utcnow()+timedelta(hours=8)
 
+        devices[pc]["status"] = "在线"
+
     return jsonify({
         "status":"ok"
+    })
+
+@app.route("/popup_show", methods=["POST"])
+def popup_show():
+
+    data = request.json
+
+    pc = data.get("pc")
+
+    device = devices.get(pc)
+    if not device:
+        return jsonify({
+            "status": "error",
+            "message": "device not found"
+        })
+
+    if device:
+
+        now = datetime.utcnow() + timedelta(hours=8)
+        # 最近一次弹窗时间
+        device["last_popup_time"] = (
+            now.strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        # 每天提醒次数清零
+        today = now.date()
+
+        if device["popup_date"] != today:
+
+            device["popup_date"] = today
+            device["today_popup_count"] = 0
+
+        # 弹窗次数+1
+        device["today_popup_count"] += 1
+        # 更新设备状态
+        device["status"] = "提醒中"
+        # 标记弹窗存在
+        device["alert_showing"] = True
+
+    # print(
+    #     "弹窗记录:",
+    #     pc,
+    #     device["last_popup_time"],
+    #     device["today_popup_count"],
+    #     "popup_show更新后:",
+    #     device["status"],
+    #     device["alert_showing"]
+    # )
+    return jsonify({
+            "status": "ok",
+            "last_popup_time": device["last_popup_time"],
+            "today_popup_count": device["today_popup_count"],
+            "device_status": device["status"]
     })
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -330,10 +387,10 @@ def report():
     user = data.get("user")
     ip = data.get("ip")
     idle = data.get("idle")
-    server_idle_minutes = data.get("server_idle_minutes")
-    popup_time = data.get("popup_time")
+    idle_minutes = data.get("idle_minutes", 0)
     alert_closed = data.get("alert_closed")
     timestamp = data.get("timestamp")
+
     # 客户端弹窗时间（如果客户端有发送）
     now = datetime.utcnow() + timedelta(hours=8)
 
@@ -342,32 +399,35 @@ def report():
             "user": user,
             "ip": ip,
             "idle": idle,
-            "status": "无操作" if idle == 1 else "在线",
+            "status": "在线",
             "time": timestamp,
             "last_report_time": now,
-
             # 最近一次提醒时间
             "last_popup_time": "-",
-
             # 今日提醒次数
             "today_popup_count": 0,
-
             # 记录提醒日期，用于每天自动清零
             "popup_date": now.date(),
-
-            "last_alert_time": None,
-
-            "alert_showing": False,
-
             "alert_closed": True,
-
             "alert_required": False,
-
-            "idle_start_time": None
+            #弹窗开始的时间
+            "idle_start_time":"-",
+            #弹窗出现
+            "alert_showing": False
         }
-
-
     device = devices[pc]
+    # =====================
+    # 更新电脑状态
+    # =====================
+
+    if idle_minutes > 30:
+        device["status"] = "休眠"
+
+    elif device.get("alert_showing"):
+        device["status"] = "提醒中"
+
+    else:
+        device["status"] = "在线"
     # 用户关闭提醒
     if alert_closed:
         device["alert_closed"] = True
@@ -376,82 +436,17 @@ def report():
     device["ip"] = ip
     device["time"] = timestamp
     device["last_report_time"] = now
-    # print(
-    #     "收到心跳:",
-    #     pc,
-    #     "idle:",
-    #     idle,
-    #     "服务器时间:",
-    #     now
-    # )
-
-    # =========================
-    # 服务器判断是否需要提醒
-    # =========================
-
+    device["idle"] = idle
+    device["idle_minutes"] = idle_minutes
+    device["idle_start_time"] = data.get(
+        "idle_start_time"
+    )
+    # =====================
+    # 判断是否提醒
+    # =====================
     show_alert = False
-    idle_seconds = 0
-
-    if idle == 1:
-
-        # 第一次进入无操作
-        if device["idle_start_time"] is None:
-            device["idle_start_time"] = now
-
-        idle_seconds = (
-                now -
-                device["idle_start_time"]
-        ).total_seconds()
-
-        if idle_seconds >= idle_limit_minutes * 60:
-
-            if not device["alert_showing"]:
-
-                show_alert = True
-
-
-
-            elif device["last_alert_time"] is not None:
-
-                alert_gap = (
-
-                        now -
-
-                        device["last_alert_time"]
-
-                ).total_seconds()
-
-                if alert_gap >= idle_limit_minutes * 60:
-                    show_alert = True
-
-            if show_alert:
-                device["last_alert_time"] = now
-
-                # print(
-                #     "触发提醒:",
-                #     pc,
-                #     "show_alert:",
-                #     show_alert,
-                #     "idle时间:",
-                #     idle_seconds
-                # )
-
-                device["alert_showing"] = True
-                device["status"] = "无操作"
-                # =====================
-                # 记录提醒次数
-                # =====================
-                today = now.date()
-
-                if device["popup_date"] != today:
-                    device["today_popup_count"] = 0
-                    device["popup_date"] = today
-
-                device["last_popup_time"] = (
-                    now.strftime("%Y-%m-%d %H:%M:%S")
-                )
-
-                device["today_popup_count"] += 1
+    if idle_minutes >= idle_limit_minutes:
+        show_alert = True
     # print(
     #     "返回客户端:",
     #     int(idle_seconds / 60),
@@ -460,9 +455,13 @@ def report():
     # )
     return jsonify({
          "status": "ok",
+         # 是否需要客户端弹窗
          "show_alert": show_alert,
-         "server_idle_minutes": int(idle_seconds / 60),
-     })
+         # 服务器认定的空闲分钟
+         "server_idle_minutes": idle_minutes,
+         # 是否已经有弹窗存在
+         "alert_showing": device["alert_showing"]
+    })
 
 @app.route('/')
 def index():
@@ -484,29 +483,24 @@ def index():
     away = 0
     offline = 0
 
-
     for pc, v in devices.items():
 
-        # 超过30分钟没有客户端心跳的数量
+        # 超过30分钟没有心跳
         if now - v["last_report_time"] > timedelta(minutes=30):
 
             v["status"] = "未连接"
-
             offline += 1
 
+        # 已经弹窗提醒，等待员工确认
+        elif v.get("alert_showing"):
 
-        # 客户端无操作数量
-        elif v.get("idle_status") == 1:
-
-            v["status"] = "无操作"
+            v["status"] = "提醒中"
             away += 1
 
-
-        # 客户端正常工作的数量
+        # 正常在线
         else:
 
             v["status"] = "在线"
-
             online += 1
     html = """
 <!DOCTYPE html>
@@ -727,7 +721,7 @@ tr:hover {
 </div>
 <div class="card">
 
-<h3>当前无操作</h3>
+<h3>办公提醒中</h3>
 
 <p style="color:#dc2626">
 
@@ -759,11 +753,11 @@ tr:hover {
        </span>
        """
 
-        elif v.get("idle_status") == 1:
+        elif v.get("status") == "提醒中":
 
             status = """
        <span class="away">
-       无操作
+       提醒中
        </span>
        """
 
