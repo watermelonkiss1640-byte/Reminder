@@ -488,7 +488,7 @@ def report():
     # 只有工作时间才判断空闲
     if current_work_time:
 
-        if idle_minutes >= idle_limit_minutes:
+        if idle_minutes > idle_limit_minutes:
 
             # 当前没有弹窗
             if not device["alert_showing"]:
