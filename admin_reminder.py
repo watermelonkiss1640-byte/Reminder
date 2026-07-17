@@ -107,15 +107,6 @@ def popup_show():
         # 标记弹窗存在
         device["alert_showing"] = True
 
-    # print(
-    #     "弹窗记录:",
-    #     pc,
-    #     device["last_popup_time"],
-    #     device["today_popup_count"],
-    #     "popup_show更新后:",
-    #     device["status"],
-    #     device["alert_showing"]
-    # )
     return jsonify({
             "status": "ok",
             "last_popup_time": device["last_popup_time"],
@@ -488,7 +479,7 @@ def report():
     # 只有工作时间才判断空闲
     if current_work_time:
 
-        if idle_minutes > idle_limit_minutes:
+        if idle_minutes >= idle_limit_minutes:
 
             # 当前没有弹窗
             if not device["alert_showing"]:
@@ -539,13 +530,11 @@ def index():
     remove_list = []
 
     for pc, v in devices.items():
-
         if now - v["last_report_time"] > timedelta(days=7):
             remove_list.append(pc)
 
     for pc in remove_list:
         del devices[pc]
-
     total = len(devices)
 
     online = 0
@@ -553,33 +542,34 @@ def index():
     offline = 0
 
     for pc, v in devices.items():
+        # ======================
+        # 判断客户端是否失联
+        # ======================
+        last_report_time = v.get(
+            "last_report_time"
+        )
 
-        # 弹窗出现30分钟，没有返回关闭
-        if v.get("alert_showing"):
+        if (
+                last_report_time
+                and now - last_report_time > timedelta(minutes=30)
+        ):
 
-            alert_start_time = v.get(
-                "alert_start_time"
+            v["status"] = "休眠"
+            offline += 1
+
+            print(
+                "进入休眠:",
+                pc,
+                "最后上报:",
+                last_report_time,
+                "当前:",
+                now,
+                "间隔:",
+                now - last_report_time
             )
 
-            if (
-                    alert_start_time
-                    and now - alert_start_time > timedelta(minutes=30)
-            ):
-                v["status"] = "休眠"
-                offline += 1
-                print(
-                    "进入休眠状态:",
-                    pc,
-                    "alert_start_time:",
-                    alert_start_time,
-                    "当前时间:",
-                    now,
-                    "持续时间:",
-                    now - alert_start_time
-            )
-            # 已经弹窗提醒，等待员工确认
-            else:
-
+        # 弹窗出现
+        elif v.get("alert_showing"):
                 v["status"] = "提醒中"
                 away += 1
 
