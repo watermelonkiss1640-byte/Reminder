@@ -28,7 +28,8 @@ def check_login():
         "/config",
         "/static/favicon.ico",
         "/warning_confirm",
-        "/popup_show"
+        "/popup_show",
+
     ]:
         return
 
@@ -46,10 +47,20 @@ def warning_confirm():
     if pc in devices:
 
         devices[pc]["alert_showing"]=False
+        #清理旧的弹窗时间
+        devices[pc]["alert_start_time"] = None
 
         devices[pc]["idle_start_time"]=datetime.utcnow()+timedelta(hours=8)
 
         devices[pc]["status"] = "在线"
+        print(
+            "确认关闭后:",
+            pc,
+            "alert_showing:",
+            devices[pc]["alert_showing"],
+            "alert_start_time:",
+            devices[pc]["alert_start_time"]
+        )
 
     return jsonify({
         "status":"ok"
@@ -89,6 +100,10 @@ def popup_show():
         device["today_popup_count"] += 1
         # 更新设备状态
         device["status"] = "提醒中"
+        #第一次进入提醒状态的时间
+        if not device.get("alert_showing"):
+            device["alert_start_time"] = now
+
         # 标记弹窗存在
         device["alert_showing"] = True
 
@@ -413,21 +428,12 @@ def report():
             #弹窗开始的时间
             "idle_start_time":"-",
             #弹窗出现
-            "alert_showing": False
+            "alert_showing": False,
+            #当前提醒开始时间
+            "alert_start_time": None
+
         }
     device = devices[pc]
-    # =====================
-    # 更新电脑状态
-    # =====================
-
-    if idle_minutes > 30:
-        device["status"] = "休眠"
-
-    elif device.get("alert_showing"):
-        device["status"] = "提醒中"
-
-    else:
-        device["status"] = "在线"
     # 用户关闭提醒
     if alert_closed:
         device["alert_closed"] = True
@@ -441,26 +447,89 @@ def report():
     device["idle_start_time"] = data.get(
         "idle_start_time"
     )
+
     # =====================
-    # 判断是否提醒
+    # 判断是否需要提醒
     # =====================
+
     show_alert = False
-    if idle_minutes >= idle_limit_minutes:
-        show_alert = True
-    # print(
-    #     "返回客户端:",
-    #     int(idle_seconds / 60),
-    #     "show_alert:",
-    #     show_alert
-    # )
+    # 当前时间
+    now_check = now
+
+    current_work_time = False
+    # 判断是否工作日
+    if now_check.weekday() in work_days:
+
+        current = now_check.strftime("%H:%M")
+
+        # 上午 09:00 - 12:00
+        if (
+                work_start_time <= current < "12:00"
+        ):
+            current_work_time = True
+
+
+        # 下午 13:00 - 18:00
+        elif (
+                "13:00" <= current < work_end_time
+        ):
+            current_work_time = True
+
+    print(
+        "工作时间判断:",
+        current_work_time,
+        "当前时间:",
+        now_check.strftime("%Y-%m-%d %H:%M")
+    )
+
+    # =====================
+    # 判断是否需要提醒
+    # =====================
+    # 只有工作时间才判断空闲
+    if current_work_time:
+
+        if idle_minutes >= idle_limit_minutes:
+
+            # 当前没有弹窗
+            if not device["alert_showing"]:
+                show_alert = True
+
+                device["alert_required"] = True
+
+        else:
+
+            device["alert_required"] = False
+
+    else:
+
+        # 非工作时间，不触发提醒
+
+        device["alert_required"] = False
+
+    print(
+            "设备状态:",
+            pc,
+            "idle:",
+            idle_minutes,
+            "alert_showing:",
+            device["alert_showing"],
+            "show_alert:",
+            show_alert,
+            "alert_required",
+            device["alert_required"]
+    )
+
     return jsonify({
          "status": "ok",
-         # 是否需要客户端弹窗
+         # 告诉客户端现在是否需要弹窗
          "show_alert": show_alert,
          # 服务器认定的空闲分钟
          "server_idle_minutes": idle_minutes,
-         # 是否已经有弹窗存在
-         "alert_showing": device["alert_showing"]
+         # 客户端是否已经显示弹窗
+         "alert_showing": device["alert_showing"],
+        #弹窗出现的时间
+        "alert_start_time": device["alert_start_time"],
+        "alert_required": device["alert_required"]
     })
 
 @app.route('/')
@@ -485,17 +554,34 @@ def index():
 
     for pc, v in devices.items():
 
-        # 超过30分钟没有心跳
-        if now - v["last_report_time"] > timedelta(minutes=30):
+        # 弹窗出现30分钟，没有返回关闭
+        if v.get("alert_showing"):
 
-            v["status"] = "未连接"
-            offline += 1
+            alert_start_time = v.get(
+                "alert_start_time"
+            )
 
-        # 已经弹窗提醒，等待员工确认
-        elif v.get("alert_showing"):
+            if (
+                    alert_start_time
+                    and now - alert_start_time > timedelta(minutes=30)
+            ):
+                v["status"] = "休眠"
+                offline += 1
+                print(
+                    "进入休眠状态:",
+                    pc,
+                    "alert_start_time:",
+                    alert_start_time,
+                    "当前时间:",
+                    now,
+                    "持续时间:",
+                    now - alert_start_time
+            )
+            # 已经弹窗提醒，等待员工确认
+            else:
 
-            v["status"] = "提醒中"
-            away += 1
+                v["status"] = "提醒中"
+                away += 1
 
         # 正常在线
         else:
@@ -745,11 +831,11 @@ tr:hover {
     #当前这台电脑现在有没有超过无操作时间。
     # 输出设备列表
     for pc, v in devices.items():
-        if v.get("status") == "未连接":
+        if v.get("status") == "休眠":
 
             status = """
        <span class="away">
-       未连接
+       无人响应
        </span>
        """
 
